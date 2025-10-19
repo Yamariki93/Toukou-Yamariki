@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""
+Automated Credential Exposure Scanner
+Author: Yamariki Toukou
+Description:
+A security automation tool designed to detect exposed or leaked credentials 
+from public sources such as breach data APIs, GitHub, or Pastebin.
+"""
+
+import re
+import requests
+import logging
+import json
+from datetime import datetime
+
+# ------------------------------
+# Configuration Section
+# ------------------------------
+
+# Example: list of company domains or emails to monitor
+TARGET_PATTERNS = [
+    r"@example\.com",        # Match emails ending with @example.com
+    r"user\d+@example\.org"  # Match user1@example.org, etc.
+]
+
+# Example API endpoint placeholder
+API_ENDPOINTS = {
+    "breach_api": "https://api.example-breach.com/search"
+}
+
+# Setup logging
+logging.basicConfig(
+    filename='exposure_scanner.log',
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
+
+# ------------------------------
+# Utility Functions
+# ------------------------------
+
+def load_targets(file_path="targets.txt"):
+    """Load target emails or patterns from a file."""
+    try:
+        with open(file_path, "r") as f:
+            targets = [line.strip() for line in f if line.strip()]
+        return targets
+    except FileNotFoundError:
+        logging.warning("No targets.txt file found. Using default patterns.")
+        return TARGET_PATTERNS
+
+def fetch_data_from_api(api_name, query):
+    """Fetch data from public APIs (placeholder function)."""
+    try:
+        url = API_ENDPOINTS.get(api_name)
+        if not url:
+            raise ValueError(f"Unknown API: {api_name}")
+        response = requests.get(url, params={"query": query}, timeout=10)
+        if response.status_code == 200:
+            return response.text
+        else:
+            logging.error(f"API {api_name} returned {response.status_code}")
+            return None
+    except requests.RequestException as e:
+        logging.error(f"API request failed: {e}")
+        return None
+
+def parse_credentials(data):
+    """Parse data for exposed emails or passwords using regex."""
+    email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
+    password_pattern = r"(?i)password[:=]\s*([^\s]+)"
+    
+    emails = re.findall(email_pattern, data)
+    passwords = re.findall(password_pattern, data)
+    
+    return {"emails": set(emails), "passwords": set(passwords)}
+
+# ------------------------------
+# Core Logic
+# ------------------------------
+
+def scan_for_exposures(targets):
+    """Main scanning function."""
+    findings = []
+    for target in targets:
+        logging.info(f"Scanning for: {target}")
+        data = fetch_data_from_api("breach_api", target)
+        if data:
+            parsed = parse_credentials(data)
+            if parsed["emails"] or parsed["passwords"]:
+                findings.append({
+                    "target": target,
+                    "emails": list(parsed["emails"]),
+                    "passwords": list(parsed["passwords"]),
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+                logging.info(f"Exposure found for {target}")
+    return findings
+
+def generate_report(findings, output_file="exposure_report.json"):
+    """Save findings to a report file."""
+    with open(output_file, "w") as f:
+        json.dump(findings, f, indent=4)
+    logging.info(f"Report saved to {output_file}")
+
+# ------------------------------
+# Main Execution
+# ------------------------------
+
+def main():
+    logging.info("Starting Automated Credential Exposure Scanner...")
+    targets = load_targets()
+    findings = scan_for_exposures(targets)
+    if findings:
+        generate_report(findings)
+        print(f"[+] Exposures found. Report saved as exposure_report.json.")
+    else:
+        print("[-] No exposures detected.")
+    logging.info("Scan completed.")
+
+if __name__ == "__main__":
+    main()
