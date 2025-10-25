@@ -1,122 +1,181 @@
-#!/usr/bin/env python3
-"""
-Automated Credential Exposure Scanner
-Author: Yamariki Toukou
-Description:
-A security automation tool designed to detect exposed or leaked credentials 
-from public sources such as breach data APIs, GitHub, or Pastebin.
-"""
+# **Automated Credential Exposure Scanner**
 
-import re
-import requests
-import logging
-import json
-from datetime import datetime
+## **Project Overview**
 
-# ------------------------------
-# Configuration Section
-# ------------------------------
+The **Automated Credential Exposure Scanner** is a **security automation tool** developed to detect **exposed or leaked credentials** from public sources such as breach data APIs, GitHub repositories, or Pastebin dumps.  
 
-# Example: list of company domains or emails to monitor
-TARGET_PATTERNS = [
-    r"@example\.com",        # Match emails ending with @example.com
-    r"user\d+@example\.org"  # Match user1@example.org, etc.
+This project was created as part of the **CYB 333 – Security Automation** course at **National University** by **Yamariki Toukou**. It demonstrates how **automation and Python scripting** can be used to strengthen an organization’s security posture by identifying compromised credentials before attackers exploit them.
+
+The tool automates the process of querying data sources, parsing returned results for credential-like patterns (emails, usernames, or passwords), and generating a structured report of any findings. It helps **reduce manual workload** for cybersecurity teams while providing **faster detection and response** capabilities.
+
+---
+
+## **Objectives and Features**
+
+### **Objectives**
+- Automate the detection of leaked or exposed credentials.  
+- Query public data sources (e.g., breach data APIs).  
+- Use **regular expressions (regex)** to identify emails and passwords.  
+- Log all activity and findings for traceability.  
+- Generate a structured JSON report for security analysis and remediation planning.  
+
+### **Key Features**
+- **Automated Scanning:** Queries APIs and parses results for credential patterns.  
+- **Regex-Based Detection:** Identifies potential emails and passwords using pattern matching.  
+- **Logging and Reporting:** Records all activities in `exposure_scanner.log` and produces a `exposure_report.json` summary.  
+- **Configurable Targets:** Allows customization of monitored domains or user patterns via `targets.txt`.  
+- **Error Handling:** Robust exception management for failed API calls or malformed data.  
+- **Extensible Architecture:** Designed for easy integration of new data sources or alerting systems (e.g., email or Slack notifications).
+
+---
+
+## **Project Structure**
+
+```
+.
+├── exposure_scanner.py          # Main Python script
+├── exposure_scanner.log         # Log file (auto-generated)
+├── exposure_report.json         # Output report (auto-generated)
+├── targets.txt                  # Optional file containing domains/emails to monitor
+├── README.md                    # Documentation file
+```
+
+---
+
+## **Setup and Installation**
+
+### **Prerequisites**
+- Python 3.8 or higher  
+- Internet connection (for API queries)  
+- Basic familiarity with command-line execution  
+
+### **Dependencies**
+Install the required Python modules using `pip`:
+```bash
+pip install requests
+```
+
+The script uses the following built-in or standard libraries:
+- `re` – for pattern matching (regex)
+- `requests` – for HTTP API calls
+- `logging` – for event logging
+- `json` – for report generation
+- `datetime` – for timestamp handling
+
+---
+
+## **Usage Instructions**
+
+1. **Clone or Download the Project**
+   ```bash
+   git clone https://github.com/Yamariki93/Toukou-Yamariki.git
+   cd Toukou-Yamariki
+   ```
+
+2. **Prepare the Target List**  
+   Create a file named `targets.txt` in the same directory, containing one email or domain pattern per line.  
+   Example:
+   ```
+   admin@example.com
+   user1@example.org
+   ```
+
+   If no file is found, the scanner defaults to the predefined patterns in the script (`@example.com`, `user\d+@example.org`).
+
+3. **Run the Scanner**
+   Execute the script from your terminal:
+   ```bash
+   python3 exposure_scanner.py
+   ```
+
+4. **View the Results**
+   - Log file: `exposure_scanner.log` – contains details of each scan and any errors encountered.  
+   - Report file: `exposure_report.json` – stores all detected exposures with timestamps.
+
+   Example console output:
+   ```
+   [+] Exposures found. Report saved as exposure_report.json.
+   ```
+   or  
+   ```
+   [-] No exposures detected.
+   ```
+
+---
+
+## **How It Works**
+
+The script loads target patterns (either from a file or predefined list) and iterates through each target to query a breach API for possible credential leaks. The response data is then parsed using regular expressions to identify valid email and password strings.  
+
+If any credentials are detected, they are stored as structured JSON data in `exposure_report.json`. The process is fully logged, ensuring transparency and traceability of all actions.
+
+---
+
+## **Code Documentation**
+
+The source code is thoroughly documented for clarity and maintenance. Each major section and function includes descriptive comments. Below is a summary of the key components:
+
+- **Configuration Section:**  
+  Defines target patterns, API endpoints, and logging configuration.  
+
+- **Utility Functions:**  
+  - `load_targets()` loads monitored patterns or domains from a text file.  
+  - `fetch_data_from_api()` retrieves potential breach data via HTTP requests.  
+  - `parse_credentials()` extracts emails and passwords using regex expressions.  
+
+- **Core Logic:**  
+  - `scan_for_exposures()` handles the main scanning and data parsing loop.  
+  - `generate_report()` writes all findings into a structured JSON file.  
+
+- **Main Execution:**  
+  The `main()` function initializes the logging system, loads targets, runs the scan, and generates a final report.
+
+---
+
+## **Example Report Output**
+
+```json
+[
+    {
+        "target": "user1@example.org",
+        "emails": ["user1@example.org"],
+        "passwords": ["P@ssw0rd123"],
+        "timestamp": "2025-10-25T14:45:02.183746"
+    }
 ]
+```
 
-# Example API endpoint placeholder
-API_ENDPOINTS = {
-    "breach_api": "https://api.example-breach.com/search"
-}
+---
 
-# Setup logging
-logging.basicConfig(
-    filename='exposure_scanner.log',
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
-)
+## **Extending the Project**
 
-# ------------------------------
-# Utility Functions
-# ------------------------------
+This project can easily be expanded to include:
+- **Multiple data sources:** Integrate Pastebin or GitHub API lookups.  
+- **Notification Systems:** Add Slack, email, or SMS alerts for real-time exposure detection.  
+- **Severity Classification:** Differentiate between hashed and plaintext exposures.  
+- **Dashboard Integration:** Display results using a web interface or monitoring tool.  
 
-def load_targets(file_path="targets.txt"):
-    """Load target emails or patterns from a file."""
-    try:
-        with open(file_path, "r") as f:
-            targets = [line.strip() for line in f if line.strip()]
-        return targets
-    except FileNotFoundError:
-        logging.warning("No targets.txt file found. Using default patterns.")
-        return TARGET_PATTERNS
+---
 
-def fetch_data_from_api(api_name, query):
-    """Fetch data from public APIs (placeholder function)."""
-    try:
-        url = API_ENDPOINTS.get(api_name)
-        if not url:
-            raise ValueError(f"Unknown API: {api_name}")
-        response = requests.get(url, params={"query": query}, timeout=10)
-        if response.status_code == 200:
-            return response.text
-        else:
-            logging.error(f"API {api_name} returned {response.status_code}")
-            return None
-    except requests.RequestException as e:
-        logging.error(f"API request failed: {e}")
-        return None
+## **Troubleshooting**
 
-def parse_credentials(data):
-    """Parse data for exposed emails or passwords using regex."""
-    email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
-    password_pattern = r"(?i)password[:=]\s*([^\s]+)"
-    
-    emails = re.findall(email_pattern, data)
-    passwords = re.findall(password_pattern, data)
-    
-    return {"emails": set(emails), "passwords": set(passwords)}
+- If the script shows *“API request failed”*, verify that the API endpoint URL in the configuration section is reachable and valid.  
+- If no exposures are detected, test the regex patterns with known data samples to confirm they match expected formats.  
+- Ensure `requests` is installed and that your environment allows outbound internet connections.  
 
-# ------------------------------
-# Core Logic
-# ------------------------------
+---
 
-def scan_for_exposures(targets):
-    """Main scanning function."""
-    findings = []
-    for target in targets:
-        logging.info(f"Scanning for: {target}")
-        data = fetch_data_from_api("breach_api", target)
-        if data:
-            parsed = parse_credentials(data)
-            if parsed["emails"] or parsed["passwords"]:
-                findings.append({
-                    "target": target,
-                    "emails": list(parsed["emails"]),
-                    "passwords": list(parsed["passwords"]),
-                    "timestamp": datetime.utcnow().isoformat()
-                })
-                logging.info(f"Exposure found for {target}")
-    return findings
+## **Credits**
 
-def generate_report(findings, output_file="exposure_report.json"):
-    """Save findings to a report file."""
-    with open(output_file, "w") as f:
-        json.dump(findings, f, indent=4)
-    logging.info(f"Report saved to {output_file}")
+- **Author:** Yamariki Toukou  
+- **Course:** CYB 333 – Security Automation  
+- **Institution:** National University  
+- **Instructor:** Prof. Eric Rivard  
+- **Year:** 2025  
 
-# ------------------------------
-# Main Execution
-# ------------------------------
+---
 
-def main():
-    logging.info("Starting Automated Credential Exposure Scanner...")
-    targets = load_targets()
-    findings = scan_for_exposures(targets)
-    if findings:
-        generate_report(findings)
-        print(f"[+] Exposures found. Report saved as exposure_report.json.")
-    else:
-        print("[-] No exposures detected.")
-    logging.info("Scan completed.")
+## **License**
 
-if __name__ == "__main__":
-    main()
+This project is provided for **educational purposes** under an open-use academic license.  
+Use responsibly and ethically — avoid scanning systems or data without proper authorization.
